@@ -10,6 +10,7 @@ variable subnet_cidr_block {}
 variable avail_zone {}
 variable env_prefix {}
 variable my_ip{}
+variable instance_type {}
 
 /* Create VPC Resource and Assign the VPC_CIDR_BLOCK Variable*/
 
@@ -39,7 +40,7 @@ resource "aws_internet_gateway" "myapp-igw" {
     tags = {
       Name = "${var.env_prefix}-igw"
     }
-  
+
  }
 
 
@@ -70,7 +71,7 @@ resource "aws_default_security_group" "default-sg" {
       from_port = 22
       protocol = "tcp"
       to_port = 22
-    } 
+    }
 
     ingress   {
       cidr_blocks = [ "0.0.0.0/0" ]
@@ -79,7 +80,7 @@ resource "aws_default_security_group" "default-sg" {
       to_port = 8080
     }
 
-/* Create Egress for Any Network and Any Protcol */ 
+/* Create Egress for Any Network and Any Protcol */
     egress {
        cidr_blocks = [ "0.0.0.0/0" ]
       from_port = 0
@@ -90,6 +91,41 @@ resource "aws_default_security_group" "default-sg" {
 
     tags = {
       Name: "${var.env_prefix}-sg"
+    }
+}
+
+    data "aws_ami" "latest-amazon-linux-image" {
+        most_recent = true
+        owners = ["amazon"]
+        filter {
+           name = "name"
+           values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+ }
+
+        filter {
+           name = "virtualization-type"
+           values = ["hvm"]
+    }
+}
+
+    output "aws_ami_id" {
+        value = data.aws_ami.latest-amazon-linux-image.id
+
+}
+
+    resource "aws_instance" "myapp-server" {
+        ami = data.aws_ami.latest-amazon-linux-image.id
+        instance_type = var.instance_type
+
+        subnet_id = aws_subnet.myapp-subnet-1.id
+        vpc_security_group_ids = [ aws_default_security_group.default-sg.id ]
+        availability_zone = var.avail_zone
+
+        associate_public_ip_address = true
+        key_name = "docker_cent"
+
+        tags = {
+            Name: "${var.env_prefix}-server"
     }
 }
 
