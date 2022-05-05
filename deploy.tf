@@ -9,8 +9,9 @@ variable vpc_cidr_block {}
 variable subnet_cidr_block {}
 variable avail_zone {}
 variable env_prefix {}
-variable my_ip{}
+variable my_ip {}
 variable instance_type {}
+variable public_key_location {}
 
 /* Create VPC Resource and Assign the VPC_CIDR_BLOCK Variable*/
 
@@ -89,10 +90,16 @@ resource "aws_default_security_group" "default-sg" {
       prefix_list_ids = []
     }
 
+
+/* Set tag to show Server Name*/
+
     tags = {
       Name: "${var.env_prefix}-sg"
     }
 }
+
+
+/* To always get the latest Amazon AMI Image Owner and Virtualization_type as the filter attributes*/
 
     data "aws_ami" "latest-amazon-linux-image" {
         most_recent = true
@@ -108,10 +115,35 @@ resource "aws_default_security_group" "default-sg" {
     }
 }
 
-    output "aws_ami_id" {
+
+/* Terraform Displays the AMI-ID as OUTPUT after applying the configs */
+
+    output  "aws_ami_id" {
         value = data.aws_ami.latest-amazon-linux-image.id
+}
+    
+
+/* Terraform Displays the PUBLIC-IP ADDRESS of the HOST after applying the configs */
+
+    output "ec2_public_ip" {
+        value = aws_instance.myapp-server.public_ip 
+  
+}
+
+
+/* Using Terraform to generate the key pairs in other to ssh into the server */
+/* First declear the a variable to refrence the key location. */
+/* In this case, the variable is "var.public_key_location", */
+/* The "${file()}"  is used to read the file location */ 
+
+    resource "aws_key_pair" "ssh-key" {
+    	key_name = "server-key"
+    	public_key = "${file(var.public_key_location)}"
 
 }
+
+
+/* This section create the EC2-INSTANCE and also assigns the instance-type, subnet-id, SG and AZ */
 
     resource "aws_instance" "myapp-server" {
         ami = data.aws_ami.latest-amazon-linux-image.id
@@ -122,10 +154,16 @@ resource "aws_default_security_group" "default-sg" {
         availability_zone = var.avail_zone
 
         associate_public_ip_address = true
-        key_name = "docker_cent"
+        key_name = aws_key_pair.ssh-key.key_name
+
+
+        user_data = file("entry-script.sh")
+           
+
+/* The tag is used to name the server */
 
         tags = {
-            Name: "${var.env_prefix}-server"
+            Name = "${var.env_prefix}-server"
     }
 }
 
